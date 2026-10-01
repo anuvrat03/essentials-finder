@@ -63,12 +63,8 @@
   .result-name { font-weight: 700; font-size: 15px; margin-bottom: 4px; color: #1a1a1a; }
   .result-meta { font-size: 12px; color: #666; margin-bottom: 2px; }
   .result-actions { margin-top: 6px; display: flex; gap: 10px; flex-wrap: wrap; }
-  .result-actions a {
-    font-size: 12px; text-decoration: none; font-weight: 600;
-  }
-  .empty-state {
-    text-align: center; padding: 30px 20px; color: #888; font-size: 14px;
-  }
+  .result-actions a { font-size: 12px; text-decoration: none; font-weight: 600; }
+  .empty-state { text-align: center; padding: 30px 20px; color: #888; font-size: 14px; }
   .popup-name { font-weight: 700; margin-bottom: 4px; }
   .popup-addr { font-size: 12px; color: #555; margin-bottom: 6px; }
   .popup-link { font-size: 12px; text-decoration: none; }
@@ -104,30 +100,24 @@
   const RADIUS_METERS = 10000;
 
   const CATEGORIES = {
-    hospital: {
-      label: 'Hospital', icon: '🏥', color: '#c62828',
-      query: `nwr["amenity"~"hospital|clinic"](around:RAD,LAT,LON);`
-    },
-    atm: {
-      label: 'ATM / Bank', icon: '🏧', color: '#1565c0',
-      query: `nwr["amenity"~"atm|bank"](around:RAD,LAT,LON);`
-    },
-    police: {
-      label: 'Police', icon: '🚓', color: '#283593',
-      query: `nwr["amenity"="police"](around:RAD,LAT,LON);`
-    },
-    fuel: {
-      label: 'Fuel Station', icon: '⛽', color: '#ef6c00',
-      query: `nwr["amenity"="fuel"](around:RAD,LAT,LON);`
-    },
-    pharmacy: {
-      label: 'Pharmacy', icon: '💊', color: '#2e7d32',
-      query: `nwr["amenity"~"pharmacy|chemist"](around:RAD,LAT,LON); nwr["shop"~"chemist|medical_supply"](around:RAD,LAT,LON);`
-    }
+    hospital: { label: 'Hospital', icon: '🏥', color: '#c62828',
+      query: `nwr["amenity"~"hospital|clinic"](around:RAD,LAT,LON);` },
+    atm:      { label: 'ATM / Bank', icon: '🏧', color: '#1565c0',
+      query: `nwr["amenity"~"atm|bank"](around:RAD,LAT,LON);` },
+    police:   { label: 'Police', icon: '🚓', color: '#283593',
+      query: `nwr["amenity"="police"](around:RAD,LAT,LON);` },
+    fuel:     { label: 'Fuel Station', icon: '⛽', color: '#ef6c00',
+      query: `nwr["amenity"="fuel"](around:RAD,LAT,LON);` },
+    pharmacy: { label: 'Pharmacy', icon: '💊', color: '#2e7d32',
+      query: `nwr["amenity"~"pharmacy|chemist"](around:RAD,LAT,LON); nwr["shop"~"chemist|medical_supply"](around:RAD,LAT,LON);` }
   };
 
   let currentCat = 'hospital';
   let userLat = null, userLon = null;
+
+  // ==== NEW: request tracking ====
+  let currentSearchId = 0;            // increments on every new search
+  let activeController = null;        // aborts in-flight fetch
 
   const map = L.map('map').setView([20.5937, 78.9629], 5);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -142,6 +132,7 @@
   function hideStatus() { statusEl.classList.remove('show'); }
 
   function selectCat(cat) {
+    if (cat === currentCat) return;      // already active — do nothing
     currentCat = cat;
     document.querySelectorAll('.cat-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.cat === cat);
@@ -186,7 +177,6 @@
     resultsEl.innerHTML = `<div class="empty-state">${msg}</div>`;
   }
 
-  // 6 Overpass servers — tried in order until one responds
   const SERVERS = [
     'https://overpass-api.de/api/interpreter',
     'https://overpass.kumi.systems/api/interpreter',
@@ -196,16 +186,23 @@
     'https://overpass.osm.ch/api/interpreter'
   ];
 
-  const SERVER_TIMEOUT_MS = 35000; // 35 seconds per server
+  const SERVER_TIMEOUT_MS = 35000;
 
   function searchCategory(lat, lon) {
     const cat = CATEGORIES[currentCat];
 
-    // Clear previous results
+    // ==== NEW: cancel previous search ====
+    currentSearchId++;                        // invalidate prior results
+    const mySearchId = currentSearchId;
+
+    if (activeController) activeController.abort();   // kill in-flight fetch
+    activeController = new AbortController();
+
+    // Clear previous pins & results immediately
     resultMarkers.forEach(m => map.removeLayer(m));
     resultMarkers = [];
 
-    resultsEl.innerHTML = `<div class="empty-state">🔍 Searching for ${cat.label} within 10 km...<br><br><small style="color:#aaa">This may take up to 3 minutes on slow connections.</small></div>`;
+    resultsEl.innerHTML = `<div class="empty-state">🔍 Searching for ${cat.label} within 10 km...<br><br><small style="color:#aaa">Tap another category to switch anytime.</small></div>`;
     showStatus('🔍 Searching ' + cat.label + '...');
 
     const body = cat.query
@@ -218,6 +215,9 @@
     tryServer(0);
 
     function tryServer(i) {
+      // ==== NEW: stop if user switched category ====
+      if (mySearchId !== currentSearchId) return;
+
       if (i >= SERVERS.length) {
         hideStatus();
         resultsEl.innerHTML = `
@@ -226,20 +226,19 @@
             Likely causes:<br>
             • Slow internet connection<br>
             • Overpass servers busy globally<br><br>
-            <b>Try again in 1 minute.</b>
+            <b>Try again in 1 minute, or tap another category.</b>
           </div>`;
         return;
       }
-      showStatus('🔍 Trying server ' + (i+1) + '/' + SERVERS.length + '...');
+      showStatus('🔍 ' + cat.label + ' — server ' + (i+1) + '/' + SERVERS.length + '...');
 
-      const controller = new AbortController();
-      const tid = setTimeout(() => controller.abort(), SERVER_TIMEOUT_MS);
+      const tid = setTimeout(() => activeController.abort(), SERVER_TIMEOUT_MS);
 
       fetch(SERVERS[i], {
         method: 'POST',
         body: 'data=' + encodeURIComponent(query),
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        signal: controller.signal
+        signal: activeController.signal
       })
         .then(r => {
           clearTimeout(tid);
@@ -247,13 +246,18 @@
           return r.json();
         })
         .then(data => {
+          // ==== NEW: ignore if user switched category mid-flight ====
+          if (mySearchId !== currentSearchId) return;
           hideStatus();
           if (!data.elements) throw new Error('No elements');
           renderResults(data.elements, lat, lon, cat);
         })
         .catch(err => {
           clearTimeout(tid);
-          console.warn('Server ' + (i+1) + ' [' + SERVERS[i] + '] failed:', err.message);
+          if (mySearchId !== currentSearchId) return;   // silently discard
+          console.warn('Server ' + (i+1) + ' failed:', err.message);
+          // create a new controller for next server (previous one is aborted)
+          activeController = new AbortController();
           tryServer(i + 1);
         });
     }
@@ -290,12 +294,10 @@
       const address = addrParts.join(', ') || '';
       const dist = map.distance([userLat, userLon], [lat, lon]) / 1000;
 
-      places.push({
-        lat, lon, name, address, dist,
+      places.push({ lat, lon, name, address, dist,
         phone: tags.phone || tags['contact:phone'] || '',
         hours: tags.opening_hours || '',
-        operator: tags.operator || ''
-      });
+        operator: tags.operator || '' });
     });
 
     places.sort((a, b) => a.dist - b.dist);
@@ -337,7 +339,7 @@
       `;
     }).join('');
 
-    showStatus(`✅ Found ${places.length} ${cat.label.toLowerCase()} places`);
+    showStatus(`✅ Found ${places.length} ${cat.label.toLowerCase()}`);
     setTimeout(hideStatus, 3000);
   }
 </script>
