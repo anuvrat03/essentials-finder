@@ -186,11 +186,17 @@
     resultsEl.innerHTML = `<div class="empty-state">${msg}</div>`;
   }
 
+  // 6 Overpass servers — tried in order until one responds
   const SERVERS = [
     'https://overpass-api.de/api/interpreter',
     'https://overpass.kumi.systems/api/interpreter',
-    'https://overpass.private.coffee/api/interpreter'
+    'https://overpass.private.coffee/api/interpreter',
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+    'https://overpass.osm.jp/api/interpreter',
+    'https://overpass.osm.ch/api/interpreter'
   ];
+
+  const SERVER_TIMEOUT_MS = 35000; // 35 seconds per server
 
   function searchCategory(lat, lon) {
     const cat = CATEGORIES[currentCat];
@@ -199,7 +205,7 @@
     resultMarkers.forEach(m => map.removeLayer(m));
     resultMarkers = [];
 
-    resultsEl.innerHTML = `<div class="empty-state">🔍 Searching for ${cat.label} within 10 km...</div>`;
+    resultsEl.innerHTML = `<div class="empty-state">🔍 Searching for ${cat.label} within 10 km...<br><br><small style="color:#aaa">This may take up to 3 minutes on slow connections.</small></div>`;
     showStatus('🔍 Searching ' + cat.label + '...');
 
     const body = cat.query
@@ -207,20 +213,27 @@
       .replace(/LAT/g, lat)
       .replace(/LON/g, lon);
 
-    const query = `[out:json][timeout:30];(${body});out center tags;`;
+    const query = `[out:json][timeout:60];(${body});out center tags;`;
 
     tryServer(0);
 
     function tryServer(i) {
       if (i >= SERVERS.length) {
         hideStatus();
-        resultsEl.innerHTML = '<div class="empty-state">❌ All servers busy. Try again in 30 seconds.</div>';
+        resultsEl.innerHTML = `
+          <div class="empty-state">
+            ❌ All ${SERVERS.length} servers failed.<br><br>
+            Likely causes:<br>
+            • Slow internet connection<br>
+            • Overpass servers busy globally<br><br>
+            <b>Try again in 1 minute.</b>
+          </div>`;
         return;
       }
       showStatus('🔍 Trying server ' + (i+1) + '/' + SERVERS.length + '...');
 
       const controller = new AbortController();
-      const tid = setTimeout(() => controller.abort(), 25000);
+      const tid = setTimeout(() => controller.abort(), SERVER_TIMEOUT_MS);
 
       fetch(SERVERS[i], {
         method: 'POST',
@@ -228,7 +241,11 @@
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         signal: controller.signal
       })
-        .then(r => { clearTimeout(tid); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(r => {
+          clearTimeout(tid);
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
         .then(data => {
           hideStatus();
           if (!data.elements) throw new Error('No elements');
@@ -236,7 +253,7 @@
         })
         .catch(err => {
           clearTimeout(tid);
-          console.warn('Server ' + (i+1) + ' failed:', err.message);
+          console.warn('Server ' + (i+1) + ' [' + SERVERS[i] + '] failed:', err.message);
           tryServer(i + 1);
         });
     }
