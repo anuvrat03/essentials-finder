@@ -2,70 +2,147 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Essentials Finder</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; font-family: system-ui, -apple-system, sans-serif; margin: 0; }
-  #map { height: 50vh; width: 100%; }
-  .top-bar {
-    position: absolute; top: 12px; left: 12px; right: 12px;
-    z-index: 1000;
+  html, body {
+    height: 100%;
+    font-family: system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
-  .title-chip {
-    background: #fff; padding: 8px 14px; border-radius: 25px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2); font-weight: 600; font-size: 13px;
-    color: #1a1a1a; display: inline-block; margin-bottom: 8px;
+
+  /* Header: title + category buttons — always visible */
+  .header {
+    background: #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    z-index: 2000;
+    flex-shrink: 0;
+  }
+  .title {
+    padding: 8px 14px 4px 14px;
+    font-weight: 700;
+    font-size: 15px;
+    color: #1a1a1a;
   }
   .category-bar {
-    display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 6px 14px 10px 14px;
     scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
   }
   .category-bar::-webkit-scrollbar { display: none; }
   .cat-btn {
-    background: #fff; color: #333; border: 2px solid #ddd;
-    padding: 8px 12px; border-radius: 20px; font-weight: 600;
-    font-size: 13px; cursor: pointer; white-space: nowrap;
-    display: flex; align-items: center; gap: 4px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    background: #f0f0f0;
+    color: #333;
+    border: 2px solid transparent;
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
     transition: all 0.15s;
   }
   .cat-btn:active { transform: scale(0.95); }
-  .cat-btn.active { color: white; border-color: transparent; }
+  .cat-btn.active { color: white; }
   .cat-btn.active[data-cat="hospital"] { background: #c62828; }
   .cat-btn.active[data-cat="atm"]      { background: #1565c0; }
   .cat-btn.active[data-cat="police"]   { background: #283593; }
   .cat-btn.active[data-cat="fuel"]     { background: #ef6c00; }
   .cat-btn.active[data-cat="pharmacy"] { background: #2e7d32; }
-  .status-chip {
-    position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
-    background: rgba(0,0,0,0.85); color: white; padding: 8px 16px;
-    border-radius: 20px; font-size: 12px; z-index: 1000; display: none;
-    max-width: 90%; text-align: center;
+
+  /* Map */
+  #map {
+    height: 42vh;
+    width: 100%;
+    flex-shrink: 0;
   }
-  .status-chip.show { display: block; }
+
+  /* Results */
   #results {
-    height: 50vh; overflow-y: auto; padding: 12px;
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px;
     background: #f5f5f5;
   }
+
   .result-card {
-    background: white; padding: 12px; margin-bottom: 10px;
-    border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    display: flex; gap: 12px; align-items: flex-start;
+    background: white;
+    padding: 12px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
   }
   .result-icon {
-    font-size: 22px; width: 40px; height: 40px;
-    border-radius: 50%; display: flex; align-items: center;
-    justify-content: center; color: white; flex-shrink: 0;
+    font-size: 20px;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    flex-shrink: 0;
   }
   .result-body { flex: 1; min-width: 0; }
-  .result-name { font-weight: 700; font-size: 15px; margin-bottom: 4px; color: #1a1a1a; }
-  .result-meta { font-size: 12px; color: #666; margin-bottom: 2px; }
-  .result-actions { margin-top: 6px; display: flex; gap: 10px; flex-wrap: wrap; }
-  .result-actions a { font-size: 12px; text-decoration: none; font-weight: 600; }
-  .empty-state { text-align: center; padding: 30px 20px; color: #888; font-size: 14px; }
-  .refresh-note { text-align: center; font-size: 11px; color: #999; margin-bottom: 8px; }
+  .result-name { font-weight: 700; font-size: 14px; margin-bottom: 4px; color: #1a1a1a; }
+  .result-meta { font-size: 12px; color: #666; margin-bottom: 2px; line-height: 1.4; }
+  .result-actions { margin-top: 8px; }
+  .result-actions a {
+    font-size: 12px;
+    text-decoration: none;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 15px;
+    border: 1.5px solid;
+    display: inline-block;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 30px 20px;
+    color: #888;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .refresh-note {
+    text-align: center;
+    font-size: 11px;
+    color: #999;
+    margin-bottom: 8px;
+  }
+
+  .status-chip {
+    position: fixed;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.85);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    z-index: 3000;
+    display: none;
+    max-width: 90%;
+    text-align: center;
+  }
+  .status-chip.show { display: block; }
+
   .popup-name { font-weight: 700; margin-bottom: 4px; }
   .popup-addr { font-size: 12px; color: #555; margin-bottom: 6px; }
   .popup-link { font-size: 12px; text-decoration: none; }
@@ -73,8 +150,8 @@
 </head>
 <body>
 
-<div class="top-bar">
-  <div class="title-chip">🧭 Essentials Finder</div>
+<div class="header">
+  <div class="title">🧭 Essentials Finder</div>
   <div class="category-bar">
     <button class="cat-btn active" data-cat="hospital" onclick="selectCat('hospital')">🏥 Hospital</button>
     <button class="cat-btn"        data-cat="atm"      onclick="selectCat('atm')">🏧 ATM</button>
@@ -83,9 +160,9 @@
     <button class="cat-btn"        data-cat="pharmacy" onclick="selectCat('pharmacy')">💊 Pharmacy</button>
   </div>
 </div>
-<div class="status-chip" id="status"></div>
 
 <div id="map"></div>
+
 <div id="results">
   <div class="empty-state">
     Pick a category above, then tap the button below to find nearby places.
@@ -95,6 +172,8 @@
     </button>
   </div>
 </div>
+
+<div class="status-chip" id="status"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -115,14 +194,11 @@
 
   let currentCat = 'hospital';
   let userLat = null, userLon = null;
-
-  // === cache: remembers results per category ===
-  const cache = {}; // { hospital: { places: [...], time: Date.now() } }
-
+  const cache = {};
   let currentSearchId = 0;
   let activeController = null;
 
-  const map = L.map('map').setView([20.5937, 78.9629], 5);
+  const map = L.map('map', { zoomControl: true }).setView([20.5937, 78.9629], 5);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap', maxZoom: 19
   }).addTo(map);
@@ -174,9 +250,7 @@
       fillOpacity: 0.04, weight: 1, dashArray: '5,5'
     }).addTo(map);
 
-    // Clear cache because location changed
     Object.keys(cache).forEach(k => delete cache[k]);
-
     searchCategory(userLat, userLon);
   }
 
@@ -202,7 +276,6 @@
   function searchCategory(lat, lon) {
     const cat = CATEGORIES[currentCat];
 
-    // 1. If cached results exist, show them instantly
     if (cache[currentCat]) {
       clearResultMarkers();
       renderResults(cache[currentCat].places, lat, lon, cat, true);
@@ -211,7 +284,6 @@
       resultsEl.innerHTML = `<div class="empty-state">🔍 Searching for ${cat.label} within 10 km...<br><br><small style="color:#aaa">You can switch categories anytime.</small></div>`;
     }
 
-    // 2. Kick off a fresh fetch in background
     currentSearchId++;
     const mySearchId = currentSearchId;
 
@@ -233,7 +305,6 @@
       if (mySearchId !== currentSearchId) return;
       if (i >= SERVERS.length) {
         hideStatus();
-        // If we had cached data, keep it. Otherwise show error.
         if (!cache[currentCat]) {
           resultsEl.innerHTML = `
             <div class="empty-state">
@@ -258,14 +329,8 @@
           if (mySearchId !== currentSearchId) return;
           hideStatus();
           if (!data.elements) throw new Error('No elements');
-
-          // Parse places
           const places = parsePlaces(data.elements, lat, lon, cat);
-
-          // Save to cache
           cache[currentCat] = { places, time: Date.now() };
-
-          // Render
           clearResultMarkers();
           renderResults(places, lat, lon, cat, false);
         })
@@ -322,7 +387,6 @@
       return;
     }
 
-    // Draw markers
     places.forEach(p => {
       const divIcon = L.divIcon({
         className: '',
@@ -341,7 +405,6 @@
       resultMarkers.push(marker);
     });
 
-    // Render list
     const refreshNote = fromCache ? '<div class="refresh-note">Showing cached results — refreshing in background…</div>' : '';
 
     resultsEl.innerHTML = refreshNote + places.map(p => {
@@ -356,7 +419,7 @@
             ${p.hours ? `<div class="result-meta">🕐 ${p.hours}</div>` : ''}
             ${p.phone ? `<div class="result-meta">📞 <a href="tel:${p.phone}" style="color:${cat.color}">${p.phone}</a></div>` : ''}
             <div class="result-actions">
-              <a style="color:${cat.color}" href="${gmaps}" target="_blank">🧭 Directions</a>
+              <a style="color:${cat.color};border-color:${cat.color}" href="${gmaps}" target="_blank">🧭 Directions</a>
             </div>
           </div>
         </div>
