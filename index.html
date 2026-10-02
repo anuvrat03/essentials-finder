@@ -14,8 +14,6 @@
     display: flex;
     flex-direction: column;
   }
-
-  /* Header: title + category buttons — always visible */
   .header {
     background: #fff;
     box-shadow: 0 2px 6px rgba(0,0,0,0.1);
@@ -60,15 +58,12 @@
   .cat-btn.active[data-cat="police"]   { background: #283593; }
   .cat-btn.active[data-cat="fuel"]     { background: #ef6c00; }
   .cat-btn.active[data-cat="pharmacy"] { background: #2e7d32; }
+  .cat-btn.active[data-cat="school"]   { background: #6a1b9a; }
+  .cat-btn.active[data-cat="college"]  { background: #ad1457; }
+  .cat-btn.active[data-cat="metro"]    { background: #00838f; }
 
-  /* Map */
-  #map {
-    height: 42vh;
-    width: 100%;
-    flex-shrink: 0;
-  }
+  #map { height: 42vh; width: 100%; flex-shrink: 0; }
 
-  /* Results */
   #results {
     flex: 1;
     overflow-y: auto;
@@ -76,7 +71,6 @@
     padding: 12px;
     background: #f5f5f5;
   }
-
   .result-card {
     background: white;
     padding: 12px;
@@ -111,7 +105,6 @@
     border: 1.5px solid;
     display: inline-block;
   }
-
   .empty-state {
     text-align: center;
     padding: 30px 20px;
@@ -125,7 +118,6 @@
     color: #999;
     margin-bottom: 8px;
   }
-
   .status-chip {
     position: fixed;
     bottom: 12px;
@@ -142,7 +134,6 @@
     text-align: center;
   }
   .status-chip.show { display: block; }
-
   .popup-name { font-weight: 700; margin-bottom: 4px; }
   .popup-addr { font-size: 12px; color: #555; margin-bottom: 6px; }
   .popup-link { font-size: 12px; text-decoration: none; }
@@ -158,6 +149,9 @@
     <button class="cat-btn"        data-cat="police"   onclick="selectCat('police')">🚓 Police</button>
     <button class="cat-btn"        data-cat="fuel"     onclick="selectCat('fuel')">⛽ Fuel</button>
     <button class="cat-btn"        data-cat="pharmacy" onclick="selectCat('pharmacy')">💊 Pharmacy</button>
+    <button class="cat-btn"        data-cat="school"   onclick="selectCat('school')">🏫 School</button>
+    <button class="cat-btn"        data-cat="college"  onclick="selectCat('college')">🎓 College</button>
+    <button class="cat-btn"        data-cat="metro"    onclick="selectCat('metro')">🚇 Metro</button>
   </div>
 </div>
 
@@ -189,7 +183,13 @@
     fuel:     { label: 'Fuel Station', icon: '⛽', color: '#ef6c00',
       query: `nwr["amenity"="fuel"](around:RAD,LAT,LON);` },
     pharmacy: { label: 'Pharmacy', icon: '💊', color: '#2e7d32',
-      query: `nwr["amenity"~"pharmacy|chemist"](around:RAD,LAT,LON); nwr["shop"~"chemist|medical_supply"](around:RAD,LAT,LON);` }
+      query: `nwr["amenity"~"pharmacy|chemist"](around:RAD,LAT,LON); nwr["shop"~"chemist|medical_supply"](around:RAD,LAT,LON);` },
+    school:   { label: 'School', icon: '🏫', color: '#6a1b9a',
+      query: `nwr["amenity"="school"](around:RAD,LAT,LON);` },
+    college:  { label: 'College', icon: '🎓', color: '#ad1457',
+      query: `nwr["amenity"~"college|university"](around:RAD,LAT,LON);` },
+    metro:    { label: 'Metro Station', icon: '🚇', color: '#00838f',
+      query: `nwr["station"="subway"](around:RAD,LAT,LON); nwr["railway"="station"]["station"="subway"](around:RAD,LAT,LON); nwr["subway"="yes"](around:RAD,LAT,LON);` }
   };
 
   let currentCat = 'hospital';
@@ -363,6 +363,10 @@
         else if (tags.amenity === 'pharmacy') name = 'Pharmacy';
         else if (tags.shop === 'chemist') name = 'Chemist';
         else if (tags.shop === 'medical_supply') name = 'Medical Store';
+        else if (tags.amenity === 'school') name = 'School';
+        else if (tags.amenity === 'college') name = 'College';
+        else if (tags.amenity === 'university') name = 'University';
+        else if (tags.station === 'subway') name = 'Metro Station';
         else name = cat.label;
       }
 
@@ -374,7 +378,8 @@
         lat, lon, name, address, dist,
         phone: tags.phone || tags['contact:phone'] || '',
         hours: tags.opening_hours || '',
-        operator: tags.operator || ''
+        operator: tags.operator || '',
+        line: tags.line || ''      // for metro: which line
       });
     });
     places.sort((a, b) => a.dist - b.dist);
@@ -399,6 +404,7 @@
         ${p.address ? `<div class="popup-addr">${p.address}</div>` : ''}
         <div class="popup-addr">📍 ${p.dist.toFixed(2)} km</div>
         ${p.hours ? `<div class="popup-addr">🕐 ${p.hours}</div>` : ''}
+        ${p.line ? `<div class="popup-addr">🚇 ${p.line}</div>` : ''}
         <a class="popup-link" style="color:${cat.color}" href="${gmaps}" target="_blank">🧭 Directions</a>
       `;
       const marker = L.marker([p.lat, p.lon], { icon: divIcon }).addTo(map).bindPopup(popup);
@@ -417,6 +423,7 @@
             ${p.address ? `<div class="result-meta">📍 ${p.address}</div>` : ''}
             <div class="result-meta"><b>${p.dist.toFixed(2)} km away</b>${p.operator ? ' · ' + p.operator : ''}</div>
             ${p.hours ? `<div class="result-meta">🕐 ${p.hours}</div>` : ''}
+            ${p.line ? `<div class="result-meta">🚇 ${p.line}</div>` : ''}
             ${p.phone ? `<div class="result-meta">📞 <a href="tel:${p.phone}" style="color:${cat.color}">${p.phone}</a></div>` : ''}
             <div class="result-actions">
               <a style="color:${cat.color};border-color:${cat.color}" href="${gmaps}" target="_blank">🧭 Directions</a>
