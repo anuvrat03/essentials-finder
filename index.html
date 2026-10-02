@@ -14,14 +14,12 @@
     background: #f5f5f5;
   }
 
-  /* HEADER — fixed at top */
   .header {
     position: fixed;
     top: 0; left: 0; right: 0;
     background: #fff;
     box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     z-index: 3000;
-    height: 88px;
   }
   .title {
     padding: 6px 14px 2px 14px;
@@ -65,24 +63,18 @@
   .cat-btn.active[data-cat="college"]  { background: #ad1457; }
   .cat-btn.active[data-cat="metro"]    { background: #00838f; }
 
-  /* MAP — takes 40% of the remaining space after header */
   #map {
     position: fixed;
-    top: 88px;
-    left: 0;
-    right: 0;
-    height: 40vh;
-    width: 100%;
+    left: 0; right: 0;
+    top: 88px;              /* JS will override this */
+    height: 250px;          /* JS will override this */
     z-index: 10;
   }
 
-  /* RESULTS — sits below the map */
   #results {
     position: fixed;
-    top: calc(88px + 40vh);
-    left: 0;
-    right: 0;
-    bottom: 0;
+    left: 0; right: 0; bottom: 0;
+    top: 340px;             /* JS will override this */
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     padding: 12px;
@@ -160,7 +152,7 @@
 </head>
 <body>
 
-<div class="header">
+<div class="header" id="header">
   <div class="title">🧭 Essentials Finder</div>
   <div class="category-bar">
     <button class="cat-btn active" data-cat="hospital" onclick="selectCat('hospital')">🏥 Hospital</button>
@@ -192,6 +184,34 @@
 <script>
   const RADIUS_METERS = 10000;
 
+  // ====== LAYOUT ENGINE ======
+  // Measures the ACTUAL visible viewport and lays out header, map, results.
+  function layout() {
+    const vh = window.innerHeight;
+    const headerEl = document.getElementById('header');
+    const headerH = headerEl.getBoundingClientRect().height;
+
+    // Map = 35% of viewport
+    const mapH = Math.round(vh * 0.35);
+
+    const mapEl = document.getElementById('map');
+    const resultsEl = document.getElementById('results');
+
+    mapEl.style.top = headerH + 'px';
+    mapEl.style.height = mapH + 'px';
+
+    resultsEl.style.top = (headerH + mapH) + 'px';
+    resultsEl.style.height = (vh - headerH - mapH) + 'px';
+
+    // Tell Leaflet its container size changed
+    if (window.map && typeof window.map.invalidateSize === 'function') {
+      setTimeout(() => map.invalidateSize(), 100);
+    }
+  }
+  window.addEventListener('resize', layout);
+  window.addEventListener('orientationchange', () => setTimeout(layout, 300));
+
+  // ====== CATEGORIES ======
   const CATEGORIES = {
     hospital: { label: 'Hospital', icon: '🏥', color: '#c62828',
       query: `nwr["amenity"~"hospital|clinic"](around:RAD,LAT,LON);` },
@@ -217,17 +237,13 @@
   let currentSearchId = 0;
   let activeController = null;
 
-  const map = L.map('map', { zoomControl: true }).setView([17.16, 78.72], 11);
+  // ====== MAP ======
+  window.map = L.map('map', { zoomControl: true }).setView([17.16, 78.72], 11);
+  const map = window.map;
+
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap', maxZoom: 19
   }).addTo(map);
-
-  // Force map to recalculate size after page fully loads
-  function refreshMap() { try { map.invalidateSize(); } catch(e) {} }
-  setTimeout(refreshMap, 300);
-  setTimeout(refreshMap, 1000);
-  window.addEventListener('resize', () => setTimeout(refreshMap, 200));
-  window.addEventListener('orientationchange', () => setTimeout(refreshMap, 500));
 
   let userMarker = null, resultMarkers = [], radiusCircle = null;
   const statusEl = document.getElementById('status');
@@ -464,6 +480,15 @@
       setTimeout(hideStatus, 3000);
     }
   }
+
+  // ====== INITIALIZE LAYOUT ======
+  // Wait for the header to fully render, then calculate positions.
+  window.addEventListener('load', () => {
+    layout();
+    setTimeout(layout, 300);
+    setTimeout(layout, 1000);
+  });
+  layout();
 </script>
 </body>
 </html>
