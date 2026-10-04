@@ -64,7 +64,7 @@
   <h2>🧭 Essentials Finder</h2>
   <p>Find nearby hospitals, ATMs, fuel pumps, and essential services.</p>
 
-  <button class="relocate-btn" onclick="requestPreciseLocation()">🎯 Refresh My Exact Location</button>
+  <button class="relocate-btn" onclick="requestPreciseLocation()">🎯 Refresh Exact Location</button>
 
   <div class="cat-bar">
     <button class="cat-btn active" onclick="switchCategory('fuel')">⛽ Fuel</button>
@@ -84,12 +84,13 @@
     let userLat = null, userLon = null;
     let currentCat = 'fuel';
 
+    // Tight 3km (3000m) radius so close spots like your 100m HP pump appear immediately
     const queries = {
-      fuel: '(node["amenity"="fuel"](around:15000,{lat},{lon});way["amenity"="fuel"](around:15000,{lat},{lon}););',
-      hospital: '(node["amenity"="hospital"](around:15000,{lat},{lon});way["amenity"="hospital"](around:15000,{lat},{lon}););',
-      atm: '(node["amenity"="atm"](around:8000,{lat},{lon});node["amenity"="bank"](around:8000,{lat},{lon}););',
-      pharmacy: '(node["amenity"="pharmacy"](around:8000,{lat},{lon}););',
-      police: '(node["amenity"="police"](around:15000,{lat},{lon});way["amenity"="police"](around:15000,{lat},{lon}););'
+      fuel: '(node["amenity"="fuel"](around:3000,{lat},{lon});way["amenity"="fuel"](around:3000,{lat},{lon}););',
+      hospital: '(node["amenity"="hospital"](around:3000,{lat},{lon});way["amenity"="hospital"](around:3000,{lat},{lon}););',
+      atm: '(node["amenity"="atm"](around:2000,{lat},{lon});node["amenity"="bank"](around:2000,{lat},{lon}););',
+      pharmacy: '(node["amenity"="pharmacy"](around:2000,{lat},{lon}););',
+      police: '(node["amenity"="police"](around:3000,{lat},{lon});way["amenity"="police"](around:3000,{lat},{lon}););'
     };
 
     function getDistance(lat1, lon1, lat2, lon2) {
@@ -103,7 +104,7 @@
     }
 
     function requestPreciseLocation() {
-      document.getElementById('status').innerText = "Locking onto high-precision GPS...";
+      document.getElementById('status').innerText = "Locking onto live GPS coordinates...";
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           userLat = pos.coords.latitude;
@@ -118,9 +119,9 @@
           loadData();
         },
         (err) => {
-          document.getElementById('status').innerText = "GPS lock failed. Ensure Location is turned on.";
+          document.getElementById('status').innerText = "GPS lock failed. Enable Location on your S20 FE.";
         },
-        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
     }
 
@@ -141,20 +142,21 @@
     async function loadData() {
       if (!userLat || !userLon) return;
 
-      document.getElementById('status').innerText = `Searching nearby ${currentCat.toUpperCase()} spots...`;
+      document.getElementById('status').innerText = `Searching nearby ${currentCat.toUpperCase()} spots within 3km...`;
       placesGroup.clearLayers();
       const resultsDiv = document.getElementById('results');
       resultsDiv.innerHTML = "";
 
       const rawQuery = queries[currentCat].replaceAll('{lat}', userLat).replaceAll('{lon}', userLon);
-      const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent('[out:json][timeout:25];' + rawQuery + 'out center 30;')}`;
+      // Fetching center results without hard capping to 30 items
+      const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent('[out:json][timeout:25];' + rawQuery + 'out center;')}`;
 
       try {
         const res = await fetch(url);
         const data = await res.json();
 
         if (!data.elements || data.elements.length === 0) {
-          document.getElementById('status').innerText = `No ${currentCat} spots found in database nearby.`;
+          document.getElementById('status').innerText = `No ${currentCat} spots found within 3 km of your current position.`;
           return;
         }
 
@@ -166,9 +168,10 @@
           return { name, lat: itemLat, lon: itemLon, dist };
         });
 
+        // Strict sort so the absolute closest spot (e.g. 100 meters) is #1
         spots.sort((a, b) => a.dist - b.dist);
 
-        document.getElementById('status').innerText = `Found ${spots.length} nearby ${currentCat} spots:`;
+        document.getElementById('status').innerText = `Found ${spots.length} nearby ${currentCat} spots within 3km:`;
 
         spots.forEach(spot => {
           if (spot.lat && spot.lon) {
@@ -190,11 +193,10 @@
         });
 
       } catch (e) {
-        document.getElementById('status').innerText = "Error fetching map data. Please reload.";
+        document.getElementById('status').innerText = "Error fetching map data. Please try again.";
       }
     }
 
-    // Auto-run on load
     requestPreciseLocation();
   </script>
 </body>
