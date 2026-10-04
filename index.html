@@ -38,20 +38,21 @@
 
     .fallback-btn {
       display: block;
-      width: 95%;
+      width: 100%;
       text-align: center;
       padding: 10px;
-      background: #e67e22;
+      background: #34495e;
       color: white;
       text-decoration: none;
       border-radius: 6px;
       font-weight: bold;
       font-size: 13px;
-      margin-bottom: 10px;
+      margin-top: 8px;
+      box-sizing: border-box;
     }
 
     #map { height: 220px; width: 100%; border-radius: 8px; margin-bottom: 10px; }
-    #status { font-size: 13px; font-weight: bold; margin-bottom: 8px; color: #d35400; }
+    #status { font-size: 13px; font-weight: bold; margin-bottom: 8px; color: #2c3e50; }
     
     .card {
       background: white;
@@ -88,9 +89,7 @@
     <button class="cat-btn" onclick="switchCategory('police')">👮 Police</button>
   </div>
 
-  <a id="gmaps-fallback" class="fallback-btn" href="#" target="_blank">🔍 Open Search in Google Maps App</a>
-
-  <div id="status">Tap 'Refresh Location' or allow GPS access...</div>
+  <div id="status">Locking onto GPS location...</div>
   <div id="map"></div>
   <div id="results"></div>
 
@@ -118,21 +117,12 @@
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
-    function updateFallbackLink() {
-      const fallbackBtn = document.getElementById('gmaps-fallback');
-      if (userLat && userLon) {
-        fallbackBtn.href = `https://www.google.com/maps/search/${encodeURIComponent(currentCat)}+near+${userLat},${userLon}`;
-        fallbackBtn.innerText = `🔍 Search ${currentCat.toUpperCase()} on Google Maps`;
-      }
-    }
-
     function requestPreciseLocation() {
-      document.getElementById('status').innerText = "Locking onto live GPS coordinates...";
+      document.getElementById('status').innerText = "Updating location...";
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           userLat = pos.coords.latitude;
           userLon = pos.coords.longitude;
-          updateFallbackLink();
           if (!map) {
             initMap();
           } else {
@@ -143,7 +133,7 @@
           loadData();
         },
         (err) => {
-          document.getElementById('status').innerText = "GPS lock failed. Enable Location on your S20 FE.";
+          document.getElementById('status').innerText = "Please enable Location access on your phone.";
         },
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
@@ -153,7 +143,6 @@
       currentCat = cat;
       document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
       if (event && event.target) event.target.classList.add('active');
-      updateFallbackLink();
       loadData();
     }
 
@@ -179,44 +168,55 @@
         const res = await fetch(url);
         const data = await res.json();
 
-        if (!data.elements || data.elements.length === 0) {
-          document.getElementById('status').innerText = `No ${currentCat} spots registered nearby in OpenStreetMap.`;
-          return;
+        let spots = [];
+        if (data.elements && data.elements.length > 0) {
+          spots = data.elements.map(item => {
+            const itemLat = item.lat || item.center?.lat;
+            const itemLon = item.lon || item.center?.lon;
+            const name = item.tags?.name || item.tags?.brand || item.tags?.operator || `${currentCat.toUpperCase()} Spot`;
+            const dist = getDistance(userLat, userLon, itemLat, itemLon);
+            return { name, lat: itemLat, lon: itemLon, dist };
+          });
+          spots.sort((a, b) => a.dist - b.dist);
         }
 
-        let spots = data.elements.map(item => {
-          const itemLat = item.lat || item.center?.lat;
-          const itemLon = item.lon || item.center?.lon;
-          const name = item.tags?.name || item.tags?.brand || item.tags?.operator || `${currentCat.toUpperCase()} Spot`;
-          const dist = getDistance(userLat, userLon, itemLat, itemLon);
-          return { name, lat: itemLat, lon: itemLon, dist };
-        });
+        if (spots.length > 0) {
+          document.getElementById('status').innerText = `Showing nearby ${currentCat} spots:`;
+          spots.forEach(spot => {
+            if (spot.lat && spot.lon) {
+              L.marker([spot.lat, spot.lon]).addTo(placesGroup).bindPopup(spot.name);
 
-        spots.sort((a, b) => a.dist - b.dist);
+              const distText = spot.dist < 1 
+                ? `${Math.round(spot.dist * 1000)} meters away` 
+                : `${spot.dist.toFixed(2)} km away`;
 
-        document.getElementById('status').innerText = `Found ${spots.length} nearby ${currentCat} spots:`;
+              const card = document.createElement('div');
+              card.className = 'card';
+              card.innerHTML = `
+                <strong>${spot.name}</strong><br>
+                <span style="color:#d35400; font-size:12px; font-weight:bold;">${distText}</span><br>
+                <a class="dir-btn" href="https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}" target="_blank">🧭 Navigation</a>
+              `;
+              resultsDiv.appendChild(card);
+            }
+          });
+        } else {
+          document.getElementById('status').innerText = `Showing navigation options nearby:`;
+        }
 
-        spots.forEach(spot => {
-          if (spot.lat && spot.lon) {
-            L.marker([spot.lat, spot.lon]).addTo(placesGroup).bindPopup(spot.name);
-
-            const distText = spot.dist < 1 
-              ? `${Math.round(spot.dist * 1000)} meters away` 
-              : `${spot.dist.toFixed(2)} km away`;
-
-            const card = document.createElement('div');
-            card.className = 'card';
-            card.innerHTML = `
-              <strong>${spot.name}</strong><br>
-              <span style="color:#d35400; font-size:12px; font-weight:bold;">${distText}</span><br>
-              <a class="dir-btn" href="https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}" target="_blank">🧭 Open Navigation</a>
-            `;
-            resultsDiv.appendChild(card);
-          }
-        });
+        // Always attach a clean, seamless search card at the bottom
+        const gmapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(currentCat)}+near+${userLat},${userLon}`;
+        const fallbackCard = document.createElement('div');
+        fallbackCard.className = 'card';
+        fallbackCard.style.textAlign = 'center';
+        fallbackCard.innerHTML = `
+          <strong style="color: #2c3e50;">Looking for additional options?</strong>
+          <a class="fallback-btn" href="${gmapsUrl}" target="_blank">🔍 Open Live ${currentCat.toUpperCase()} Search</a>
+        `;
+        resultsDiv.appendChild(fallbackCard);
 
       } catch (e) {
-        document.getElementById('status').innerText = "Error fetching map data. Please try again.";
+        document.getElementById('status').innerText = "Unable to load spots right now. Please retry.";
       }
     }
 
