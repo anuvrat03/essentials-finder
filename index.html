@@ -32,8 +32,22 @@
       border: none;
       border-radius: 6px;
       font-weight: bold;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       cursor: pointer;
+    }
+
+    .fallback-btn {
+      display: block;
+      width: 95%;
+      text-align: center;
+      padding: 10px;
+      background: #e67e22;
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 13px;
+      margin-bottom: 10px;
     }
 
     #map { height: 220px; width: 100%; border-radius: 8px; margin-bottom: 10px; }
@@ -74,6 +88,8 @@
     <button class="cat-btn" onclick="switchCategory('police')">👮 Police</button>
   </div>
 
+  <a id="gmaps-fallback" class="fallback-btn" href="#" target="_blank">🔍 Open Search in Google Maps App</a>
+
   <div id="status">Tap 'Refresh Location' or allow GPS access...</div>
   <div id="map"></div>
   <div id="results"></div>
@@ -84,13 +100,12 @@
     let userLat = null, userLon = null;
     let currentCat = 'fuel';
 
-    // Tight 3km (3000m) radius so close spots like your 100m HP pump appear immediately
     const queries = {
-      fuel: '(node["amenity"="fuel"](around:3000,{lat},{lon});way["amenity"="fuel"](around:3000,{lat},{lon}););',
-      hospital: '(node["amenity"="hospital"](around:3000,{lat},{lon});way["amenity"="hospital"](around:3000,{lat},{lon}););',
-      atm: '(node["amenity"="atm"](around:2000,{lat},{lon});node["amenity"="bank"](around:2000,{lat},{lon}););',
-      pharmacy: '(node["amenity"="pharmacy"](around:2000,{lat},{lon}););',
-      police: '(node["amenity"="police"](around:3000,{lat},{lon});way["amenity"="police"](around:3000,{lat},{lon}););'
+      fuel: '(node["amenity"="fuel"](around:5000,{lat},{lon});way["amenity"="fuel"](around:5000,{lat},{lon}););',
+      hospital: '(node["amenity"="hospital"](around:5000,{lat},{lon});way["amenity"="hospital"](around:5000,{lat},{lon}););',
+      atm: '(node["amenity"="atm"](around:3000,{lat},{lon});node["amenity"="bank"](around:3000,{lat},{lon}););',
+      pharmacy: '(node["amenity"="pharmacy"](around:3000,{lat},{lon}););',
+      police: '(node["amenity"="police"](around:5000,{lat},{lon});way["amenity"="police"](around:5000,{lat},{lon}););'
     };
 
     function getDistance(lat1, lon1, lat2, lon2) {
@@ -103,12 +118,21 @@
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
+    function updateFallbackLink() {
+      const fallbackBtn = document.getElementById('gmaps-fallback');
+      if (userLat && userLon) {
+        fallbackBtn.href = `https://www.google.com/maps/search/${encodeURIComponent(currentCat)}+near+${userLat},${userLon}`;
+        fallbackBtn.innerText = `🔍 Search ${currentCat.toUpperCase()} on Google Maps`;
+      }
+    }
+
     function requestPreciseLocation() {
       document.getElementById('status').innerText = "Locking onto live GPS coordinates...";
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           userLat = pos.coords.latitude;
           userLon = pos.coords.longitude;
+          updateFallbackLink();
           if (!map) {
             initMap();
           } else {
@@ -129,6 +153,7 @@
       currentCat = cat;
       document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
       if (event && event.target) event.target.classList.add('active');
+      updateFallbackLink();
       loadData();
     }
 
@@ -142,13 +167,12 @@
     async function loadData() {
       if (!userLat || !userLon) return;
 
-      document.getElementById('status').innerText = `Searching nearby ${currentCat.toUpperCase()} spots within 3km...`;
+      document.getElementById('status').innerText = `Searching nearby ${currentCat.toUpperCase()} spots...`;
       placesGroup.clearLayers();
       const resultsDiv = document.getElementById('results');
       resultsDiv.innerHTML = "";
 
       const rawQuery = queries[currentCat].replaceAll('{lat}', userLat).replaceAll('{lon}', userLon);
-      // Fetching center results without hard capping to 30 items
       const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent('[out:json][timeout:25];' + rawQuery + 'out center;')}`;
 
       try {
@@ -156,7 +180,7 @@
         const data = await res.json();
 
         if (!data.elements || data.elements.length === 0) {
-          document.getElementById('status').innerText = `No ${currentCat} spots found within 3 km of your current position.`;
+          document.getElementById('status').innerText = `No ${currentCat} spots registered nearby in OpenStreetMap.`;
           return;
         }
 
@@ -168,10 +192,9 @@
           return { name, lat: itemLat, lon: itemLon, dist };
         });
 
-        // Strict sort so the absolute closest spot (e.g. 100 meters) is #1
         spots.sort((a, b) => a.dist - b.dist);
 
-        document.getElementById('status').innerText = `Found ${spots.length} nearby ${currentCat} spots within 3km:`;
+        document.getElementById('status').innerText = `Found ${spots.length} nearby ${currentCat} spots:`;
 
         spots.forEach(spot => {
           if (spot.lat && spot.lon) {
