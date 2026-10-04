@@ -1,494 +1,175 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Essentials Finder</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body {
-    height: 100%;
-    font-family: system-ui, -apple-system, sans-serif;
-    overflow: hidden;
-    background: #f5f5f5;
-  }
-
-  .header {
-    position: fixed;
-    top: 0; left: 0; right: 0;
-    background: #fff;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-    z-index: 3000;
-  }
-  .title {
-    padding: 6px 14px 2px 14px;
-    font-weight: 700;
-    font-size: 14px;
-    color: #1a1a1a;
-  }
-  .category-bar {
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    padding: 4px 14px 8px 14px;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-  .category-bar::-webkit-scrollbar { display: none; }
-  .cat-btn {
-    background: #f0f0f0;
-    color: #333;
-    border: 2px solid transparent;
-    padding: 7px 13px;
-    border-radius: 20px;
-    font-weight: 600;
-    font-size: 12.5px;
-    cursor: pointer;
-    white-space: nowrap;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-shrink: 0;
-    transition: all 0.15s;
-  }
-  .cat-btn:active { transform: scale(0.95); }
-  .cat-btn.active { color: white; }
-  .cat-btn.active[data-cat="hospital"] { background: #c62828; }
-  .cat-btn.active[data-cat="atm"]      { background: #1565c0; }
-  .cat-btn.active[data-cat="police"]   { background: #283593; }
-  .cat-btn.active[data-cat="fuel"]     { background: #ef6c00; }
-  .cat-btn.active[data-cat="pharmacy"] { background: #2e7d32; }
-  .cat-btn.active[data-cat="school"]   { background: #6a1b9a; }
-  .cat-btn.active[data-cat="college"]  { background: #ad1457; }
-  .cat-btn.active[data-cat="metro"]    { background: #00838f; }
-
-  #map {
-    position: fixed;
-    left: 0; right: 0;
-    top: 88px;              /* JS will override this */
-    height: 250px;          /* JS will override this */
-    z-index: 10;
-  }
-
-  #results {
-    position: fixed;
-    left: 0; right: 0; bottom: 0;
-    top: 340px;             /* JS will override this */
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: 12px;
-    background: #f5f5f5;
-    z-index: 5;
-  }
-
-  .result-card {
-    background: white;
-    padding: 12px;
-    margin-bottom: 10px;
-    border-radius: 10px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    display: flex;
-    gap: 12px;
-    align-items: flex-start;
-  }
-  .result-icon {
-    font-size: 20px;
-    width: 38px; height: 38px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    flex-shrink: 0;
-  }
-  .result-body { flex: 1; min-width: 0; }
-  .result-name { font-weight: 700; font-size: 14px; margin-bottom: 4px; color: #1a1a1a; }
-  .result-meta { font-size: 12px; color: #666; margin-bottom: 2px; line-height: 1.4; }
-  .result-actions { margin-top: 8px; }
-  .result-actions a {
-    font-size: 12px;
-    text-decoration: none;
-    font-weight: 700;
-    padding: 6px 12px;
-    border-radius: 15px;
-    border: 1.5px solid;
-    display: inline-block;
-  }
-  .empty-state {
-    text-align: center;
-    padding: 30px 20px;
-    color: #888;
-    font-size: 14px;
-    line-height: 1.6;
-  }
-  .refresh-note {
-    text-align: center;
-    font-size: 11px;
-    color: #999;
-    margin-bottom: 8px;
-  }
-
-  .status-chip {
-    position: fixed;
-    bottom: 12px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0,0,0,0.85);
-    color: white;
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 12px;
-    z-index: 4000;
-    display: none;
-    max-width: 90%;
-    text-align: center;
-  }
-  .status-chip.show { display: block; }
-  .popup-name { font-weight: 700; margin-bottom: 4px; }
-  .popup-addr { font-size: 12px; color: #555; margin-bottom: 6px; }
-  .popup-link { font-size: 12px; text-decoration: none; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Essentials Finder</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body { font-family: Arial, sans-serif; padding: 10px; background: #f4f6f8; margin: 0; }
+    h2 { color: #2c3e50; margin: 5px 0; }
+    p { margin: 0 0 10px 0; color: #555; font-size: 13px; }
+    
+    .cat-bar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .cat-btn {
+      flex: 1 1 30%;
+      padding: 8px 4px;
+      font-size: 12px;
+      font-weight: bold;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #fff;
+      color: #333;
+      cursor: pointer;
+    }
+    .cat-btn.active { background: #27ae60; color: white; border-color: #27ae60; }
+    
+    #map { height: 220px; width: 100%; border-radius: 8px; margin-bottom: 10px; }
+    #status { font-size: 13px; font-weight: bold; margin-bottom: 8px; }
+    
+    .card {
+      background: white;
+      padding: 10px;
+      border-radius: 6px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      margin-bottom: 8px;
+    }
+    .dir-btn {
+      display: inline-block;
+      margin-top: 5px;
+      padding: 5px 10px;
+      background: #2980b9;
+      color: white;
+      text-decoration: none;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+  </style>
 </head>
 <body>
 
-<div class="header" id="header">
-  <div class="title">🧭 Essentials Finder</div>
-  <div class="category-bar">
-    <button class="cat-btn active" data-cat="hospital" onclick="selectCat('hospital')">🏥 Hospital</button>
-    <button class="cat-btn"        data-cat="atm"      onclick="selectCat('atm')">🏧 ATM</button>
-    <button class="cat-btn"        data-cat="police"   onclick="selectCat('police')">🚓 Police</button>
-    <button class="cat-btn"        data-cat="fuel"     onclick="selectCat('fuel')">⛽ Fuel</button>
-    <button class="cat-btn"        data-cat="pharmacy" onclick="selectCat('pharmacy')">💊 Pharmacy</button>
-    <button class="cat-btn"        data-cat="school"   onclick="selectCat('school')">🏫 School</button>
-    <button class="cat-btn"        data-cat="college"  onclick="selectCat('college')">🎓 College</button>
-    <button class="cat-btn"        data-cat="metro"    onclick="selectCat('metro')">🚇 Metro</button>
+  <h2>🧭 Essentials Finder</h2>
+  <p>Find nearby hospitals, ATMs, fuel stations, and essential services.</p>
+
+  <div class="cat-bar">
+    <button class="cat-btn active" onclick="switchCategory('fuel')">⛽ Fuel</button>
+    <button class="cat-btn" onclick="switchCategory('hospital')">🏥 Hospital</button>
+    <button class="cat-btn" onclick="switchCategory('atm')">🏧 ATM</button>
+    <button class="cat-btn" onclick="switchCategory('pharmacy')">💊 Pharmacy</button>
+    <button class="cat-btn" onclick="switchCategory('police')">👮 Police</button>
   </div>
-</div>
 
-<div id="map"></div>
+  <div id="status">Accessing GPS...</div>
+  <div id="map"></div>
+  <div id="results"></div>
 
-<div id="results">
-  <div class="empty-state">
-    Pick a category above, then tap the button below to find nearby places.
-    <br><br>
-    <button onclick="findNearby()" style="background:#1976d2;color:white;border:none;padding:12px 24px;border-radius:25px;font-weight:700;font-size:14px;cursor:pointer;">
-      📍 Find Nearby
-    </button>
-  </div>
-</div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    let map, userMarker, placesGroup;
+    let userLat = null, userLon = null;
+    let currentCat = 'fuel';
 
-<div class="status-chip" id="status"></div>
+    const queries = {
+      fuel: '(node["amenity"="fuel"](around:5000,{lat},{lon});way["amenity"="fuel"](around:5000,{lat},{lon}););',
+      hospital: '(node["amenity"="hospital"](around:5000,{lat},{lon});way["amenity"="hospital"](around:5000,{lat},{lon}););',
+      atm: '(node["amenity"="atm"](around:3000,{lat},{lon});node["amenity"="bank"](around:3000,{lat},{lon}););',
+      pharmacy: '(node["amenity"="pharmacy"](around:3000,{lat},{lon}););',
+      police: '(node["amenity"="police"](around:5000,{lat},{lon});way["amenity"="police"](around:5000,{lat},{lon}););'
+    };
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-  const RADIUS_METERS = 10000;
-
-  // ====== LAYOUT ENGINE ======
-  // Measures the ACTUAL visible viewport and lays out header, map, results.
-  function layout() {
-    const vh = window.innerHeight;
-    const headerEl = document.getElementById('header');
-    const headerH = headerEl.getBoundingClientRect().height;
-
-    // Map = 35% of viewport
-    const mapH = Math.round(vh * 0.35);
-
-    const mapEl = document.getElementById('map');
-    const resultsEl = document.getElementById('results');
-
-    mapEl.style.top = headerH + 'px';
-    mapEl.style.height = mapH + 'px';
-
-    resultsEl.style.top = (headerH + mapH) + 'px';
-    resultsEl.style.height = (vh - headerH - mapH) + 'px';
-
-    // Tell Leaflet its container size changed
-    if (window.map && typeof window.map.invalidateSize === 'function') {
-      setTimeout(() => map.invalidateSize(), 100);
-    }
-  }
-  window.addEventListener('resize', layout);
-  window.addEventListener('orientationchange', () => setTimeout(layout, 300));
-
-  // ====== CATEGORIES ======
-  const CATEGORIES = {
-    hospital: { label: 'Hospital', icon: '🏥', color: '#c62828',
-      query: `nwr["amenity"~"hospital|clinic"](around:RAD,LAT,LON);` },
-    atm:      { label: 'ATM / Bank', icon: '🏧', color: '#1565c0',
-      query: `nwr["amenity"~"atm|bank"](around:RAD,LAT,LON);` },
-    police:   { label: 'Police', icon: '🚓', color: '#283593',
-      query: `nwr["amenity"="police"](around:RAD,LAT,LON);` },
-    fuel:     { label: 'Fuel Station', icon: '⛽', color: '#ef6c00',
-      query: `nwr["amenity"="fuel"](around:RAD,LAT,LON);` },
-    pharmacy: { label: 'Pharmacy', icon: '💊', color: '#2e7d32',
-      query: `nwr["amenity"~"pharmacy|chemist"](around:RAD,LAT,LON); nwr["shop"~"chemist|medical_supply"](around:RAD,LAT,LON);` },
-    school:   { label: 'School', icon: '🏫', color: '#6a1b9a',
-      query: `nwr["amenity"="school"](around:RAD,LAT,LON);` },
-    college:  { label: 'College', icon: '🎓', color: '#ad1457',
-      query: `nwr["amenity"~"college|university"](around:RAD,LAT,LON);` },
-    metro:    { label: 'Metro Station', icon: '🚇', color: '#00838f',
-      query: `nwr["station"="subway"](around:RAD,LAT,LON); nwr["railway"="station"]["station"="subway"](around:RAD,LAT,LON); nwr["subway"="yes"](around:RAD,LAT,LON);` }
-  };
-
-  let currentCat = 'hospital';
-  let userLat = null, userLon = null;
-  const cache = {};
-  let currentSearchId = 0;
-  let activeController = null;
-
-  // ====== MAP ======
-  window.map = L.map('map', { zoomControl: true }).setView([17.16, 78.72], 11);
-  const map = window.map;
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap', maxZoom: 19
-  }).addTo(map);
-
-  let userMarker = null, resultMarkers = [], radiusCircle = null;
-  const statusEl = document.getElementById('status');
-  const resultsEl = document.getElementById('results');
-
-  function showStatus(msg) { statusEl.textContent = msg; statusEl.classList.add('show'); }
-  function hideStatus() { statusEl.classList.remove('show'); }
-
-  function clearResultMarkers() {
-    resultMarkers.forEach(m => map.removeLayer(m));
-    resultMarkers = [];
-  }
-
-  function selectCat(cat) {
-    if (cat === currentCat) return;
-    currentCat = cat;
-    document.querySelectorAll('.cat-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.cat === cat);
-    });
-    if (userLat && userLon) {
-      searchCategory(userLat, userLon);
-    }
-  }
-
-  function findNearby() {
-    if (!navigator.geolocation) { showStatus('❌ No location support'); return; }
-    showStatus('📡 Getting location...');
-    navigator.geolocation.getCurrentPosition(onLocation, onLocationError,
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
-  }
-
-  function onLocation(pos) {
-    userLat = pos.coords.latitude;
-    userLon = pos.coords.longitude;
-
-    map.setView([userLat, userLon], 13);
-
-    if (userMarker) map.removeLayer(userMarker);
-    userMarker = L.circleMarker([userLat, userLon], {
-      radius: 9, color: '#1976d2', fillColor: '#2196f3', fillOpacity: 1, weight: 3
-    }).addTo(map).bindPopup('📍 You are here');
-
-    if (radiusCircle) map.removeLayer(radiusCircle);
-    radiusCircle = L.circle([userLat, userLon], {
-      radius: RADIUS_METERS, color: '#1976d2', fillColor: '#1976d2',
-      fillOpacity: 0.04, weight: 1, dashArray: '5,5'
-    }).addTo(map);
-
-    Object.keys(cache).forEach(k => delete cache[k]);
-    searchCategory(userLat, userLon);
-  }
-
-  function onLocationError(err) {
-    let msg = '❌ Location error.';
-    if (err.code === 1) msg = '❌ Please allow location permission.';
-    if (err.code === 2) msg = '❌ Location unavailable.';
-    if (err.code === 3) msg = '❌ Location request timed out.';
-    resultsEl.innerHTML = `<div class="empty-state">${msg}</div>`;
-  }
-
-  const SERVERS = [
-    'https://overpass-api.de/api/interpreter',
-    'https://overpass.kumi.systems/api/interpreter',
-    'https://overpass.private.coffee/api/interpreter',
-    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-    'https://overpass.osm.jp/api/interpreter',
-    'https://overpass.osm.ch/api/interpreter'
-  ];
-
-  const SERVER_TIMEOUT_MS = 35000;
-
-  function searchCategory(lat, lon) {
-    const cat = CATEGORIES[currentCat];
-
-    if (cache[currentCat]) {
-      clearResultMarkers();
-      renderResults(cache[currentCat].places, lat, lon, cat, true);
-    } else {
-      clearResultMarkers();
-      resultsEl.innerHTML = `<div class="empty-state">🔍 Searching for ${cat.label} within 10 km...<br><br><small style="color:#aaa">You can switch categories anytime.</small></div>`;
+    function getDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
-    currentSearchId++;
-    const mySearchId = currentSearchId;
+    function switchCategory(cat) {
+      currentCat = cat;
+      document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+      loadData();
+    }
 
-    if (activeController) activeController.abort();
-    activeController = new AbortController();
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        userLat = pos.coords.latitude;
+        userLon = pos.coords.longitude;
+        initMap();
+        loadData();
+      },
+      () => {
+        document.getElementById('status').innerText = "Please enable GPS on your S20 FE.";
+      },
+      { enableHighAccuracy: true }
+    );
 
-    showStatus('🔍 Updating ' + cat.label + '...');
+    function initMap() {
+      map = L.map('map').setView([userLat, userLon], 14);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+      placesGroup = L.layerGroup().addTo(map);
+      userMarker = L.marker([userLat, userLon]).addTo(map).bindPopup("You are here").openPopup();
+    }
 
-    const body = cat.query
-      .replace(/RAD/g, RADIUS_METERS)
-      .replace(/LAT/g, lat)
-      .replace(/LON/g, lon);
+    async function loadData() {
+      if (!userLat || !userLon) return;
 
-    const query = `[out:json][timeout:60];(${body});out center tags;`;
+      document.getElementById('status').innerText = `Searching nearby ${currentCat.toUpperCase()} spots...`;
+      placesGroup.clearLayers();
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = "";
 
-    tryServer(0);
+      const rawQuery = queries[currentCat].replaceAll('{lat}', userLat).replaceAll('{lon}', userLon);
+      const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent('[out:json][timeout:15];' + rawQuery + 'out center 20;')}`;
 
-    function tryServer(i) {
-      if (mySearchId !== currentSearchId) return;
-      if (i >= SERVERS.length) {
-        hideStatus();
-        if (!cache[currentCat]) {
-          resultsEl.innerHTML = `
-            <div class="empty-state">
-              ❌ All ${SERVERS.length} servers failed.<br><br>
-              Try again in 1 minute.
-            </div>`;
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (!data.elements || data.elements.length === 0) {
+          document.getElementById('status').innerText = `No ${currentCat} spots found within 5km.`;
+          return;
         }
-        return;
-      }
-      showStatus('🔍 ' + cat.label + ' — server ' + (i+1) + '/' + SERVERS.length + '...');
 
-      const tid = setTimeout(() => activeController.abort(), SERVER_TIMEOUT_MS);
-
-      fetch(SERVERS[i], {
-        method: 'POST',
-        body: 'data=' + encodeURIComponent(query),
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        signal: activeController.signal
-      })
-        .then(r => { clearTimeout(tid); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-        .then(data => {
-          if (mySearchId !== currentSearchId) return;
-          hideStatus();
-          if (!data.elements) throw new Error('No elements');
-          const places = parsePlaces(data.elements, lat, lon, cat);
-          cache[currentCat] = { places, time: Date.now() };
-          clearResultMarkers();
-          renderResults(places, lat, lon, cat, false);
-        })
-        .catch(err => {
-          clearTimeout(tid);
-          if (mySearchId !== currentSearchId) return;
-          console.warn('Server ' + (i+1) + ' failed:', err.message);
-          activeController = new AbortController();
-          tryServer(i + 1);
+        let spots = data.elements.map(item => {
+          const itemLat = item.lat || item.center?.lat;
+          const itemLon = item.lon || item.center?.lon;
+          const name = item.tags?.name || item.tags?.brand || `${currentCat.toUpperCase()} Spot`;
+          const dist = getDistance(userLat, userLon, itemLat, itemLon);
+          return { name, lat: itemLat, lon: itemLon, dist };
         });
-    }
-  }
 
-  function parsePlaces(elements, userLat, userLon, cat) {
-    const places = [];
-    elements.forEach(el => {
-      const lat = el.lat || (el.center && el.center.lat);
-      const lon = el.lon || (el.center && el.center.lon);
-      if (!lat || !lon) return;
-      const tags = el.tags || {};
+        spots.sort((a, b) => a.dist - b.dist);
 
-      let name = tags.name || tags['name:en'] || tags.operator || '';
-      if (!name) {
-        if (tags.amenity === 'atm') name = tags.operator ? tags.operator + ' ATM' : 'ATM';
-        else if (tags.amenity === 'bank') name = 'Bank';
-        else if (tags.amenity === 'hospital') name = 'Hospital';
-        else if (tags.amenity === 'clinic') name = 'Clinic';
-        else if (tags.amenity === 'police') name = 'Police Station';
-        else if (tags.amenity === 'fuel') name = 'Fuel Station';
-        else if (tags.amenity === 'pharmacy') name = 'Pharmacy';
-        else if (tags.shop === 'chemist') name = 'Chemist';
-        else if (tags.shop === 'medical_supply') name = 'Medical Store';
-        else if (tags.amenity === 'school') name = 'School';
-        else if (tags.amenity === 'college') name = 'College';
-        else if (tags.amenity === 'university') name = 'University';
-        else if (tags.station === 'subway') name = 'Metro Station';
-        else name = cat.label;
+        document.getElementById('status').innerText = `Found ${spots.length} nearby ${currentCat} spots:`;
+
+        spots.forEach(spot => {
+          if (spot.lat && spot.lon) {
+            L.marker([spot.lat, spot.lon]).addTo(placesGroup).bindPopup(spot.name);
+
+            const distText = spot.dist < 1 
+              ? `${Math.round(spot.dist * 1000)} meters away` 
+              : `${spot.dist.toFixed(2)} km away`;
+
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+              <strong>${spot.name}</strong><br>
+              <span style="color:#d35400; font-size:12px; font-weight:bold;">${distText}</span><br>
+              <a class="dir-btn" href="https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}" target="_blank">🧭 Navigation</a>
+            `;
+            resultsDiv.appendChild(card);
+          }
+        });
+
+      } catch (e) {
+        document.getElementById('status').innerText = "Error fetching data. Please try again.";
       }
-
-      const addrParts = [tags['addr:housenumber'], tags['addr:street'], tags['addr:suburb'], tags['addr:city']].filter(Boolean);
-      const address = addrParts.join(', ') || '';
-      const dist = map.distance([userLat, userLon], [lat, lon]) / 1000;
-
-      places.push({
-        lat, lon, name, address, dist,
-        phone: tags.phone || tags['contact:phone'] || '',
-        hours: tags.opening_hours || '',
-        operator: tags.operator || '',
-        line: tags.line || ''
-      });
-    });
-    places.sort((a, b) => a.dist - b.dist);
-    return places;
-  }
-
-  function renderResults(places, userLat, userLon, cat, fromCache) {
-    if (!places || places.length === 0) {
-      resultsEl.innerHTML = `<div class="empty-state">😔 No ${cat.label.toLowerCase()} found within 10 km.<br><br>OpenStreetMap may not have this data in your area yet.</div>`;
-      return;
     }
-
-    places.forEach(p => {
-      const divIcon = L.divIcon({
-        className: '',
-        html: `<div style="background:${cat.color};color:white;width:32px;height:32px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.4);border:2px solid white;font-size:14px;"><span style="transform:rotate(45deg);">${cat.icon}</span></div>`,
-        iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -32]
-      });
-      const gmaps = `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}`;
-      const popup = `
-        <div class="popup-name" style="color:${cat.color}">${cat.icon} ${p.name}</div>
-        ${p.address ? `<div class="popup-addr">${p.address}</div>` : ''}
-        <div class="popup-addr">📍 ${p.dist.toFixed(2)} km</div>
-        ${p.hours ? `<div class="popup-addr">🕐 ${p.hours}</div>` : ''}
-        ${p.line ? `<div class="popup-addr">🚇 ${p.line}</div>` : ''}
-        <a class="popup-link" style="color:${cat.color}" href="${gmaps}" target="_blank">🧭 Directions</a>
-      `;
-      const marker = L.marker([p.lat, p.lon], { icon: divIcon }).addTo(map).bindPopup(popup);
-      resultMarkers.push(marker);
-    });
-
-    const refreshNote = fromCache ? '<div class="refresh-note">Showing cached results — refreshing in background…</div>' : '';
-
-    resultsEl.innerHTML = refreshNote + places.map(p => {
-      const gmaps = `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}`;
-      return `
-        <div class="result-card">
-          <div class="result-icon" style="background:${cat.color}">${cat.icon}</div>
-          <div class="result-body">
-            <div class="result-name">${p.name}</div>
-            ${p.address ? `<div class="result-meta">📍 ${p.address}</div>` : ''}
-            <div class="result-meta"><b>${p.dist.toFixed(2)} km away</b>${p.operator ? ' · ' + p.operator : ''}</div>
-            ${p.hours ? `<div class="result-meta">🕐 ${p.hours}</div>` : ''}
-            ${p.line ? `<div class="result-meta">🚇 ${p.line}</div>` : ''}
-            ${p.phone ? `<div class="result-meta">📞 <a href="tel:${p.phone}" style="color:${cat.color}">${p.phone}</a></div>` : ''}
-            <div class="result-actions">
-              <a style="color:${cat.color};border-color:${cat.color}" href="${gmaps}" target="_blank">🧭 Directions</a>
-            </div>
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    if (!fromCache) {
-      showStatus(`✅ Found ${places.length} ${cat.label.toLowerCase()}`);
-      setTimeout(hideStatus, 3000);
-    }
-  }
-
-  // ====== INITIALIZE LAYOUT ======
-  // Wait for the header to fully render, then calculate positions.
-  window.addEventListener('load', () => {
-    layout();
-    setTimeout(layout, 300);
-    setTimeout(layout, 1000);
-  });
-  layout();
-</script>
+  </script>
 </body>
 </html>
